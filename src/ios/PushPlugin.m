@@ -128,12 +128,12 @@
     }
 #else
     [[UIApplication sharedApplication] registerForRemoteNotificationTypes:notificationTypes];
-#endif
-    
-    if (notificationMessage)			// if there is a pending startup notification
-        [self notificationReceived];	// go ahead and process it
-    
+    /*
+     Check if ios 7 or less.
+     Check if the push notifications are activated
+     */
     UIRemoteNotificationType types = [[UIApplication sharedApplication] enabledRemoteNotificationTypes];
+    NSLog(@"Types: %lu", types);
     if (types == UIRemoteNotificationTypeNone){
         
         NSLog(@"Nix da");
@@ -142,9 +142,82 @@
         CDVPluginResult *commandResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:errorMessage];
         
         [self.commandDelegate sendPluginResult:commandResult callbackId:self.callbackId];
+        
+        NSLog(@"------------------");
+        NSLog(@"errorMessage: %@", errorMessage);
+        NSLog(@"commandResult: %@", commandResult);
+        NSLog(@"callbackId: %@", self.callbackId);
+        NSLog(@"------------------");
+        
     }
     
+    
+#endif
+    
+    if (notificationMessage)			// if there is a pending startup notification
+        [self notificationReceived];	// go ahead and process it
+    
+    
+    /*
+     SETUP the check if iOS8 and set the standard to -1 if push notifications deactivated
+     */
+    
+    
+#define SYSTEM_VERSION_LESS_THAN(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
+    
+    
+    if (!SYSTEM_VERSION_LESS_THAN(@"8.0")) {
+        NSLog(@"Version 8 oder höher");
+        if ([[UIApplication sharedApplication]respondsToSelector:@selector(registerUserNotificationSettings:)]) {
+            UIUserNotificationSettings *settings = [UIUserNotificationSettings settingsForTypes:UserNotificationTypes categories:nil];
+            [[UIApplication sharedApplication] registerUserNotificationSettings:settings];
+            [[UIApplication sharedApplication] registerForRemoteNotifications];
+            
+            
+            UIUserNotificationSettings *grantedSettings = [[UIApplication sharedApplication] currentUserNotificationSettings];
+            if (grantedSettings.types == UIUserNotificationTypeNone) {
+                NSLog(@"No permiossion granted");
+                NSString *errorMessage = @"-1";
+                CDVPluginResult *commandResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:errorMessage];
+                
+                [self.commandDelegate sendPluginResult:commandResult callbackId:self.callbackId];
+            }
+            else if (grantedSettings.types & UIUserNotificationTypeSound & UIUserNotificationTypeAlert ){
+                NSLog(@"Sound and alert permissions ");
+            }
+            else if (grantedSettings.types  & UIUserNotificationTypeAlert){
+                NSLog(@"Alert Permission Granted");
+            }
+            
+        } else {
+            [[UIApplication sharedApplication] registerForRemoteNotificationTypes:notificationTypes];
+            NSLog(@"-----");
+        }
+        
+    } else {
+        NSLog(@"Version unter 8");
+        UIRemoteNotificationType types = [[UIApplication sharedApplication] enabledRemoteNotificationTypes];
+        if (types == UIRemoteNotificationTypeNone){
+            
+            NSLog(@"Nix da");
+            
+            NSString *errorMessage = @"-1";
+            CDVPluginResult *commandResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:errorMessage];
+            
+            [self.commandDelegate sendPluginResult:commandResult callbackId:self.callbackId];
+            
+            //            NSLog(@"------------------");
+            //            NSLog(@"errorMessage: %@", errorMessage);
+            //            NSLog(@"commandResult: %@", commandResult);
+            //            NSLog(@"callbackId: %@", self.callbackId);
+            //            NSLog(@"------------------");
+            
+        }
+    }
 }
+
+
+
 
 /*
  - (void)isEnabled:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options {
@@ -156,14 +229,11 @@
 
 - (void)didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
     
-    NSLog(@"--> didRegisterForRemoteNotificationsWithDeviceToken");
-    
     NSMutableDictionary *results = [NSMutableDictionary dictionary];
     NSString *token = [[[[deviceToken description] stringByReplacingOccurrencesOfString:@"<"withString:@""]
                         stringByReplacingOccurrencesOfString:@">" withString:@""]
                        stringByReplacingOccurrencesOfString: @" " withString: @""];
     [results setValue:token forKey:@"deviceToken"];
-    NSLog(@"DeviceToken: %@", deviceToken);
     
 #if !TARGET_IPHONE_SIMULATOR
     // Get Bundle Info for Remote Registration (handy if you have more than one app)
@@ -214,20 +284,6 @@
 - (void)notificationReceived {
     NSLog(@"Notification received");
     
-    NSLog(@"NotifiactionMessage: %@", notificationMessage);
-    
-    
-    NSDictionary* pushUrlDictionary = [NSDictionary dictionaryWithDictionary:notificationMessage];
-    if ([[pushUrlDictionary allKeys] containsObject:@"pushUrl"]) {
-        NSLog(@"'key' exists.");
-        NSLog(@"---> %@", [pushUrlDictionary valueForKey:@"pushUrl"]);
-        pushUrlString = [NSString stringWithFormat:@"%@", [pushUrlDictionary valueForKey:@"pushUrl"]];
-    }
-    //    id badgeArg = [options objectForKey:@"badge"];
-    
-    
-    
-    
     if (notificationMessage && self.callback)
     {
         NSMutableString *jsonStr = [NSMutableString stringWithString:@"{"];
@@ -251,39 +307,6 @@
         
         self.notificationMessage = nil;
     }
-    
-    // NSURL Request
-    NSString *pushUrl = pushUrlString;
-    //NSLog(@".......------> %@ <--------.....", pushUrl);
-    NSURL* sfUrl = [NSURL URLWithString:pushUrl];
-    //NSLog(@"URL: %@", sfUrl);
-    // set the request
-    NSURLRequest* sfRequest = [NSURLRequest requestWithURL:sfUrl];
-    NSOperationQueue* sfQueue = [[NSOperationQueue alloc] init];
-    
-    typedef void (^CompletionBlock)(NSURLResponse *, NSData *, NSError *);
-    __block CompletionBlock completionHandler = nil;
-    
-    // Block to start the request
-    dispatch_block_t enqueueBlock = ^{
-        [NSURLConnection sendAsynchronousRequest:sfRequest queue:sfQueue completionHandler:completionHandler];
-    };
-    
-    completionHandler = ^(NSURLResponse *sfResponse, NSData *sfData, NSError *sfError) {
-        if (sfError) {
-            enqueueBlock();
-            NSLog(@"Error: %@", sfError);
-            
-        } else {
-            NSString* myResponse;
-            myResponse = [[NSString alloc] initWithData:sfData encoding:NSUTF8StringEncoding];
-            //NSLog(@"Response: %@", myResponse);
-        }
-    };
-    
-    enqueueBlock();
-    
-    
 }
 
 // reentrant method to drill down and surface all sub-dictionaries' key/value pairs into the top level json
@@ -321,7 +344,6 @@
     [[UIApplication sharedApplication] setApplicationIconBadgeNumber:badge];
     
     [self successWithMessage:[NSString stringWithFormat:@"app badge count set to %d", badge]];
-    NSLog(@"Set Badge to: %d", badge);
 }
 -(void)successWithMessage:(NSString *)message
 {
@@ -339,10 +361,5 @@
     
     [self.commandDelegate sendPluginResult:commandResult callbackId:self.callbackId];
 }
-
-
-
-
-
 
 @end
