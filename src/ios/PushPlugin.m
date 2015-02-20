@@ -194,13 +194,56 @@
             NSLog(@"-----");
         }
         
+        //    ---  START  IOS PUSH DEBUG TESTING
+        
+        
+        [[UIApplication sharedApplication] respondsToSelector:@selector(registerUserNotificationSettings:)];
+        NSLog(@"test: %hhd", [[UIApplication sharedApplication] respondsToSelector:@selector(registerUserNotificationSettings:)]);
+        UIUserNotificationSettings *userPushSettings =  [UIUserNotificationSettings settingsForTypes:(UIUserNotificationTypeBadge | UIUserNotificationTypeSound | UIUserNotificationTypeAlert) categories:nil];
+        NSLog(@"UserPushSettings: %@", userPushSettings );
+        
+        [[UIApplication sharedApplication] registerUserNotificationSettings:userPushSettings];
+        NSLog(@"Push Settings: %@", [[UIApplication sharedApplication] currentUserNotificationSettings] );
+        
+        
+        //    ---  END IOS PUSH DEBUG TESTING
     } else {
         NSLog(@"Version unter 8");
         UIRemoteNotificationType types = [[UIApplication sharedApplication] enabledRemoteNotificationTypes];
-        if (types == UIRemoteNotificationTypeNone){
+        
+        if (types & UIRemoteNotificationTypeNone){
             
             NSLog(@"Nix da");
             
+            NSString *errorMessage = @"-1";
+            CDVPluginResult *commandResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:errorMessage];
+            
+            [self.commandDelegate sendPluginResult:commandResult callbackId:self.callbackId];
+            
+            NSLog(@"------------------");
+            NSLog(@"errorMessage: %@", errorMessage);
+            NSLog(@"commandResult: %@", commandResult);
+            NSLog(@"callbackId: %@", self.callbackId);
+            NSLog(@"------------------");
+            
+        }
+        
+        //        NSLog(@"---- Notification Type: %u", types);
+        //        NSLog(@"---- UIRemoteNotificationTypeNone: %lu", (unsigned long)UIRemoteNotificationTypeNone);
+        //        NSLog(@"---- UIRemoteNotificationTypeBadge: %lu", (unsigned long)UIRemoteNotificationTypeBadge);
+        //        NSLog(@"---- UIRemoteNotificationTypeSound: %lu", (unsigned long)UIRemoteNotificationTypeSound);
+        //        NSLog(@"---- Notification Status: %u", [[UIApplication sharedApplication] enabledRemoteNotificationTypes]);
+        // NSLog(@"---- DeviceToken: %@", )
+        
+        
+        UIRemoteNotificationType types4 = [[UIApplication sharedApplication] enabledRemoteNotificationTypes];
+        if (types4 & UIRemoteNotificationTypeAlert)
+        {
+            NSLog(@"Notification Enabled");
+        }
+        else
+        {
+            NSLog(@"Notification not enabled");
             NSString *errorMessage = @"-1";
             CDVPluginResult *commandResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:errorMessage];
             
@@ -211,8 +254,10 @@
             //            NSLog(@"commandResult: %@", commandResult);
             //            NSLog(@"callbackId: %@", self.callbackId);
             //            NSLog(@"------------------");
-            
         }
+        
+        
+        
     }
 }
 
@@ -234,6 +279,7 @@
                         stringByReplacingOccurrencesOfString:@">" withString:@""]
                        stringByReplacingOccurrencesOfString: @" " withString: @""];
     [results setValue:token forKey:@"deviceToken"];
+    // NSLog(@"deviceToken: %@", deviceToken);
     
 #if !TARGET_IPHONE_SIMULATOR
     // Get Bundle Info for Remote Registration (handy if you have more than one app)
@@ -273,6 +319,8 @@
     [results setValue:dev.systemVersion forKey:@"deviceSystemVersion"];
     
     [self successWithMessage:[NSString stringWithFormat:@"%@", token]];
+    NSLog(@"successWithMessage: %@", token);
+    
 #endif
 }
 
