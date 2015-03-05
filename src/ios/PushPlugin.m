@@ -22,6 +22,7 @@
  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#define SYSTEM_VERSION_LESS_THAN(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
 
 #import "PushPlugin.h"
 
@@ -45,6 +46,7 @@
 
 - (void)register:(CDVInvokedUrlCommand*)command;
 {
+    NSLog(@"Push Registration");
     self.callbackId = command.callbackId;
     
     NSMutableDictionary* options = [command.arguments objectAtIndex:0];
@@ -162,10 +164,6 @@
      SETUP the check if iOS8 and set the standard to -1 if push notifications deactivated
      */
     
-    
-#define SYSTEM_VERSION_LESS_THAN(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
-    
-    
     if (!SYSTEM_VERSION_LESS_THAN(@"8.0")) {
         NSLog(@"Version 8 oder höher");
         if ([[UIApplication sharedApplication]respondsToSelector:@selector(registerUserNotificationSettings:)]) {
@@ -209,6 +207,19 @@
         //    ---  END IOS PUSH DEBUG TESTING
     } else {
         NSLog(@"Version unter 8");
+        NSLog(@"aktuelle Version: %@", [[UIDevice currentDevice] systemVersion] );
+        
+        
+        // Daniel Push test - start
+        
+        [[UIApplication sharedApplication] registerForRemoteNotificationTypes: (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+        UIRemoteNotificationType enabledTypes = [[UIApplication sharedApplication] enabledRemoteNotificationTypes];
+        NSLog(@"PushNotification Types: %u", enabledTypes);
+        
+        
+        // Daniel Push test - end
+        
+        
         UIRemoteNotificationType types = [[UIApplication sharedApplication] enabledRemoteNotificationTypes];
         
         if (types & UIRemoteNotificationTypeNone){
